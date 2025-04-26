@@ -9,19 +9,13 @@ import time
 import os
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-import models
+import models, schemas
 from database import engine, SessionLocal, get_db
 
 models.Base.metadata.create_all(bind=engine)
 load_dotenv()
 
 app = FastAPI()
-
-class Post(BaseModel):
-    title: str
-    content: str
-    published: bool = True
-    #rating: Optional[int] = None
 
 # Get credentials from environment variables
 DB_NAME = os.getenv("DB_NAME")
@@ -49,17 +43,6 @@ while True:
         print("Error: ", error)
         time.sleep(2)
 
-my_posts = [{"title": "title of post 1", "content": "content of post 1", "id": 1}, {"title": "title of post 2", "content": "content of post 2", "id": 3}]
-
-def find_post(id):
-    for p in my_posts:
-        if p["id"] == id:
-            return p
-
-def find_index_post(id):
-    for index, post in enumerate(my_posts):
-        if post['id'] == id:
-            return index
 
 @app.get("/")
 def root():
@@ -70,22 +53,18 @@ def get_posts(db: Session = Depends(get_db)):
     # cursor.execute("""SELECT *FROM posts""")
     # posts = cursor.fetchall()
     posts =db.query(models.Post).all()
-    return {"data": posts}
+    return posts
 
 @app.post("/posts", status_code=status.HTTP_201_CREATED)
-def create_posts(post: Post, db: Session = Depends(get_db)):
+def create_posts(post: schemas.PostCreate, db: Session = Depends(get_db)):
     #cursor.execute(""" INSERT INTO posts (title, content, published) VALUES (%s, %s, %s) RETURNING *""", 
     #               (post.title, post.content, post.published))
     new_post = models.Post(**post.dict())
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
-    return {"data": new_post}
+    return new_post
 
-@app.get("/posts/latest")
-def get_latest_post():
-    latest = my_posts[len(my_posts)-1]
-    return {"detail": latest}
 
 @app.get("/posts/{id}")
 def get_post(id: int, db: Session = Depends(get_db)):
@@ -95,7 +74,7 @@ def get_post(id: int, db: Session = Depends(get_db)):
     if not post:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                             detail=f"post with id: {id} not found")   
-    return {"post_Detail": post}
+    return post
 
 @app.delete("/posts/{id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(id: int, db: Session = Depends(get_db)):
@@ -111,7 +90,7 @@ def delete_post(id: int, db: Session = Depends(get_db)):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 @app.put("/posts/{id}")
-def update_post(id: int, post: Post, db: Session = Depends(get_db)):
+def update_post(id: int, post: schemas.PostCreate, db: Session = Depends(get_db)):
     #cursor.execute(""" UPDATE posts SET title = %s, content = %s, published = %s WHERE id = %s RETURNING *""", (post.title, post.content, post.published, str(id)))
     #onn.commit()
     #updated_post = cursor.fetchone()
@@ -123,6 +102,6 @@ def update_post(id: int, post: Post, db: Session = Depends(get_db)):
     post_update.update(post.dict(), synchronize_session=False)
     db.commit()
 
-    return {'data': post_update.first()}
+    return post_update.first()
 
         
